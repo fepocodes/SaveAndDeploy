@@ -10,30 +10,31 @@ const GITHUB_TOKEN = process.env['Github_Token']
 const REPOS_DIR = path.join(__dirname, "../");
 
 async function createRepoOnGitHub(repoName) {
-    try {
-        const res = await axios.post(
-            "https://api.github.com/user/repos",
-            {
-                name: repoName,
-                private: false,
-            },
-            {
-                headers: {
-                    Authorization: `token ${GITHUB_TOKEN}`,
-                    Accept: "application/vnd.github+json",
-                },
-            }
-        );
-        console.log(`✅ GitHub repo created: ${res.data.full_name}`);
-        return res.data.clone_url;
-    } catch (err) {
-        if (err.response?.status === 422) {
-            console.log(`⚠️ Repo ${repoName} already exists on GitHub.`);
-            return `https://github.com/${GITHUB_USERNAME}/${repoName}.git`;
-        } else {
-            throw err;
-        }
+  try {
+    const res = await axios.post(
+      "https://api.github.com/user/repos",
+      {
+        name: repoName,
+        private: false,
+        auto_init: false
+      },
+      {
+        headers: {
+          Authorization: `token ${GITHUB_TOKEN}`,
+          Accept: "application/vnd.github+json",
+        },
+      }
+    );
+    console.log(`✅ GitHub repo created: ${res.data.full_name}`);
+    return res.data.clone_url;
+  } catch (err) {
+    if (err.response?.status === 422) {
+      console.log(`⚠️ Repo ${repoName} already exists on GitHub.`);
+      return `https://github.com/${GITHUB_USERNAME}/${repoName}.git`;
+    } else {
+      throw err;
     }
+  }
 }
 
 async function processRepo(dirName) {
@@ -49,8 +50,10 @@ async function processRepo(dirName) {
   }
 
   const isGit = fs.existsSync(path.join(repoPath, ".git"));
+  let remoteUrl = `https://github.com/${GITHUB_USERNAME}/${dirName}.git`;
+
   if (!isGit) {
-    const remoteUrl = await createRepoOnGitHub(dirName);
+    remoteUrl = await createRepoOnGitHub(dirName);
     await git.init();
     await git.addRemote("origin", remoteUrl);
   }
@@ -73,7 +76,7 @@ async function processRepo(dirName) {
         fs.rmSync(path.join(repoPath, ".git"), { recursive: true, force: true });
 
         const fresh = simpleGit(repoPath);
-        const remoteUrl = await createRepoOnGitHub(dirName);
+        remoteUrl = await createRepoOnGitHub(dirName);
         await fresh.init();
         await fresh.addRemote("origin", remoteUrl);
         await fresh.add(".");
@@ -92,32 +95,19 @@ async function processRepo(dirName) {
 }
 
 async function main() {
-    let allDirs = fs.readdirSync(REPOS_DIR).filter(f =>
-        fs.statSync(path.join(REPOS_DIR, f)).isDirectory()
-    );
+  const allDirs = fs.readdirSync(REPOS_DIR).filter(f =>
+    fs.statSync(path.join(REPOS_DIR, f)).isDirectory()
+  );
 
-    for (const dir of allDirs) {
-        try {
-            await processRepo(dir);
-        } catch (e) {
-            console.error(`❌ Error for ${dir}:`, e.message);
-        }
+  for (const dir of allDirs) {
+    try {
+      await processRepo(dir);
+    } catch (e) {
+      console.error(`❌ Error for ${dir}:`, e.message);
     }
+  }
 
-    allDirs = fs.readdirSync(REPOS_DIR).filter(f =>
-        fs.statSync(path.join(REPOS_DIR, f)).isDirectory()
-    );
-
-    for (const dir of allDirs) {
-        try {
-            await processRepo(dir);
-            await processRepo(dir);
-        } catch (e) {
-            console.error(`❌ Error for ${dir}:`, e.message);
-        }
-    }
-
-    console.log("🎉 All repositories processed.");
+  console.log("🎉 All repositories processed.");
 }
 
-main()
+main();
