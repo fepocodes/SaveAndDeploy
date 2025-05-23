@@ -8,7 +8,7 @@ const simpleGit = require("simple-git");
 // Credentials
 const GITHUB_USERNAME = "fepocodes";
 const GITLAB_USERNAME = "fepocodes";
-const BITBUCKET_USERNAME = "fepocodes-admin";
+const BITBUCKET_USERNAME = "fepocodes";
 
 const GITHUB_TOKEN = process.env['Github_Token'];
 const GITLAB_TOKEN = process.env['Gitlab_Token'];
