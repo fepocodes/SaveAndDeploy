@@ -29,7 +29,7 @@ async function createRepoOnGitHub(repoName) {
         return res.data.clone_url;
     } catch (err) {
         if (err.response?.status === 422) {
-            console.log(`⚠️ Repo ${repoName} already exists on GitHub.`);
+            //console.log(`⚠️ Repo ${repoName} already exists on GitHub.`);
             return `https://github.com/${GITHUB_USERNAME}/${repoName}.git`;
         } else {
             throw err;
@@ -39,19 +39,14 @@ async function createRepoOnGitHub(repoName) {
 
 async function processRepo(dirName) {
     const repoPath = path.join(REPOS_DIR, dirName);
-
     const git = simpleGit(repoPath);
-
-
-
     let remoteUrl
+
     try {
         remoteUrl = await createRepoOnGitHub(dirName);
         await git.init();
         await git.addRemote("origin", remoteUrl);
     } catch { }
-
-
 
     try {
         await git.raw(["rm", "-r", "--cached", "."]);
