@@ -90,7 +90,7 @@ async function processRepo(dirName) {
         await git.commit("🔄 Auto commit changes");
         try {
             await git.push("gitlab", "master");
-            await git.push("github", "master");
+            //await git.push("github", "master");
         } catch (err) {
             if (err.message.includes("refspec") || err.message.includes("rejected")) {
                 console.log(`🧹 Repo broken (${dirName}), resetting...`);
@@ -105,7 +105,7 @@ async function processRepo(dirName) {
                 await fresh.add(".");
                 await fresh.commit("🚀 Clean reset push");
                 await fresh.push("gitlab", "master", ["--force"]);
-                await fresh.push("github", "master", ["--force"]);
+            //    await fresh.push("github", "master", ["--force"]);
                 console.log(`✅ ${dirName} reset and pushed cleanly.`);
                 return;
             } else {
