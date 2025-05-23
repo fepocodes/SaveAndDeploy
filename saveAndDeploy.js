@@ -98,10 +98,10 @@ async function processRepo(dirName) {
 
                 const fresh = simpleGit(repoPath);
                 gitlabUrl = await createRepoOnGitLab(dirName);
-                githubUrl = await createRepoOnGitHub(dirName);
+                //githubUrl = await createRepoOnGitHub(dirName);
                 await fresh.init();
                 await fresh.addRemote("gitlab", gitlabUrl);
-                await fresh.addRemote("github", githubUrl);
+                //await fresh.addRemote("github", githubUrl);
                 await fresh.add(".");
                 await fresh.commit("🚀 Clean reset push");
                 await fresh.push("gitlab", "master", ["--force"]);
