@@ -44,13 +44,10 @@ async function processRepo(dirName) {
 
 
     const isGit = fs.existsSync(path.join(repoPath, ".git"));
+console.log(isGit)
 
-
-    if (!isGit) {
-        const remoteUrl = await createRepoOnGitHub(dirName);
+      
         await git.init();
-        await git.addRemote("origin", remoteUrl);
-    }
  
 
 
