@@ -1,0 +1,22 @@
+# Ignore everything starting with a dot
+.*
+
+# But keep .gitignore itself
+!.gitignore
+
+# Just in case, ignore Git internals (not strictly necessary)
+.git/
+
+# 🎥 Ignore video files
+*.mp4
+*.mov
+*.mkv
+*.avi
+*.webm
+
+*.mp3
+
+*.srt
+
+# 📁 Ignore raw folder
+vid/
