@@ -39,17 +39,21 @@ async function createRepoOnGitHub(repoName) {
 
 async function processRepo(dirName) {
   const repoPath = path.join(REPOS_DIR, dirName);
-  const gitignorePath = path.join(repoPath, ".gitignore");
+
   const git = simpleGit(repoPath);
 
-  // 🔒 Inject .gitignore if missing
-  const gitignoreContent = `.*\n!.gitignore\n*.mp4\n*.mov\n*.mkv\nvid/\n.git/\n`;
-  if (!fs.existsSync(gitignorePath)) {
-    fs.writeFileSync(gitignorePath, gitignoreContent);
-    console.log(`🛡️ Created .gitignore in ${dirName}`);
-  }
 
-  const isGit = fs.existsSync(path.join(repoPath, ".git"));
+    const isGit = fs.existsSync(path.join(repoPath, ".git"));
+
+
+    if (!isGit) {
+        const remoteUrl = await createRepoOnGitHub(dirName);
+        await git.init();
+        await git.addRemote("origin", remoteUrl);
+    }
+ 
+
+
   let remoteUrl = `https://github.com/${GITHUB_USERNAME}/${dirName}.git`;
 
   if (!isGit) {
