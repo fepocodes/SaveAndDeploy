@@ -52,6 +52,8 @@ async function processRepo(dirName) {
     const status = await git.status();
 
     if (status.not_added.length || status.modified.length || status.deleted.length) {
+          await git.raw(["rm", "-r", "--cached", "."]);
+          
         await git.add(".");
         await git.commit("🔄 Auto commit changes");
         try {
