@@ -37,53 +37,58 @@ async function createRepoOnGitHub(repoName) {
 }
 
 async function processRepo(dirName) {
-    const repoPath = path.join(REPOS_DIR, dirName);
-    const git = simpleGit(repoPath);
+  const repoPath = path.join(REPOS_DIR, dirName);
+  const gitignorePath = path.join(repoPath, ".gitignore");
+  const git = simpleGit(repoPath);
 
-    const isGit = fs.existsSync(path.join(repoPath, ".git"));
-    const githubUrl = `https://github.com/${GITHUB_USERNAME}/${dirName}.git`;
+  // 🔒 Inject .gitignore if missing
+  const gitignoreContent = `.*\n!.gitignore\n*.mp4\n*.mov\n*.mkv\nvid/\n.git/\n`;
+  if (!fs.existsSync(gitignorePath)) {
+    fs.writeFileSync(gitignorePath, gitignoreContent);
+    console.log(`🛡️ Created .gitignore in ${dirName}`);
+  }
 
-    if (!isGit) {
+  const isGit = fs.existsSync(path.join(repoPath, ".git"));
+  if (!isGit) {
+    const remoteUrl = await createRepoOnGitHub(dirName);
+    await git.init();
+    await git.addRemote("origin", remoteUrl);
+  }
+
+  // 🔥 Force Git to re-index
+  try {
+    await git.raw(["rm", "-r", "--cached", "."]);
+  } catch {}
+
+  const status = await git.status();
+
+  if (status.not_added.length || status.modified.length || status.deleted.length) {
+    await git.add(".");
+    await git.commit("🔄 Auto commit changes");
+    try {
+      await git.push("origin", "master");
+    } catch (err) {
+      if (err.message.includes("refspec") || err.message.includes("rejected")) {
+        console.log(`🧹 Repo broken (${dirName}), resetting...`);
+        fs.rmSync(path.join(repoPath, ".git"), { recursive: true, force: true });
+
+        const fresh = simpleGit(repoPath);
         const remoteUrl = await createRepoOnGitHub(dirName);
-        await git.init();
-        await git.addRemote("origin", remoteUrl);
+        await fresh.init();
+        await fresh.addRemote("origin", remoteUrl);
+        await fresh.add(".");
+        await fresh.commit("🚀 Clean reset push");
+        await fresh.push("origin", "master", ["--force"]);
+        console.log(`✅ ${dirName} reset and pushed cleanly.`);
+        return;
+      } else {
+        throw err;
+      }
     }
-
-    const status = await git.status();
-
-    if (status.not_added.length || status.modified.length || status.deleted.length) {
-          await git.raw(["rm", "-r", "--cached", "."]);
-          
-        await git.add(".");
-        await git.commit("🔄 Auto commit changes");
-        try {
-            await git.push("origin", "master");
-        } catch (e) {
-            try {
-                await git.push("origin", "main");
-            } catch (err) {
-                if (err.message.includes("refspec main does not match any") || err.message.includes("failed to push")) {
-                    console.log(`🧹 Repo broken (${dirName}), resetting...`);
-                    fs.rmSync(path.join(repoPath, ".git"), { recursive: true, force: true });
-
-                    const gitClean = simpleGit(repoPath);
-                    const remoteUrl = await createRepoOnGitHub(dirName);
-
-                    await gitClean.init();
-                    await gitClean.addRemote("origin", remoteUrl);
-                    await gitClean.add(".");
-                    await gitClean.commit("🚀 First clean commit after reset");
-                    await gitClean.push("origin", "master", ["--force"]);
-                    console.log(`✅ ${dirName} reset and pushed cleanly.`);
-                } else {
-                    throw err;
-                }
-            }
-        }
-        console.log(`🚀 Changes pushed for ${dirName}`);
-    } else {
-        console.log(`✅ ${dirName} is up to date. No changes to commit.`);
-    }
+    console.log(`🚀 Changes pushed for ${dirName}`);
+  } else {
+    console.log(`✅ ${dirName} is up to date. No changes to commit.`);
+  }
 }
 
 async function main() {
