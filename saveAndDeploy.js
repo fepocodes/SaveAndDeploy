@@ -31,7 +31,7 @@ async function createRepoOnGitHub(repoName) {
         return res.data.clone_url;
     } catch (err) {
         if (err.response?.status === 422) {
-            console.log(`⚠️ Repo ${repoName} already exists on GitHub.`);
+            //console.log(`⚠️ Repo ${repoName} already exists on GitHub.`);
             return `https://github.com/${GITHUB_USERNAME}/${repoName}.git`;
         } else {
             throw err;
@@ -57,7 +57,7 @@ async function createRepoOnGitLab(repoName) {
         return res.data.http_url_to_repo;
     } catch (err) {
         if (err.response?.status === 400 || err.response?.status === 409) {
-            console.log(`⚠️ Repo ${repoName} already exists on GitLab.`);
+            //console.log(`⚠️ Repo ${repoName} already exists on GitLab.`);
             return `https://gitlab.com/${GITLAB_USERNAME}/${repoName}.git`;
         } else {
             throw err;
@@ -72,11 +72,11 @@ async function processRepo(dirName) {
 
     try {
         gitlabUrl = await createRepoOnGitLab(dirName);
-        //githubUrl = await createRepoOnGitHub(dirName);
+        githubUrl = await createRepoOnGitHub(dirName);
 
         await git.init();
         await git.addRemote("gitlab", gitlabUrl);
-        //await git.addRemote("github", githubUrl);
+        await git.addRemote("github", githubUrl);
     } catch {}
 
     try {
@@ -90,7 +90,7 @@ async function processRepo(dirName) {
         await git.commit("🔄 Auto commit changes");
         try {
             await git.push("gitlab", "master");
-            //await git.push("github", "master");
+            await git.push("github", "master");
         } catch (err) {
             if (err.message.includes("refspec") || err.message.includes("rejected")) {
                 console.log(`🧹 Repo broken (${dirName}), resetting...`);
@@ -98,14 +98,14 @@ async function processRepo(dirName) {
 
                 const fresh = simpleGit(repoPath);
                 gitlabUrl = await createRepoOnGitLab(dirName);
-                //githubUrl = await createRepoOnGitHub(dirName);
+                githubUrl = await createRepoOnGitHub(dirName);
                 await fresh.init();
                 await fresh.addRemote("gitlab", gitlabUrl);
-                //await fresh.addRemote("github", githubUrl);
+                await fresh.addRemote("github", githubUrl);
                 await fresh.add(".");
                 await fresh.commit("🚀 Clean reset push");
                 await fresh.push("gitlab", "master", ["--force"]);
-            //    await fresh.push("github", "master", ["--force"]);
+                await fresh.push("github", "master", ["--force"]);
                 console.log(`✅ ${dirName} reset and pushed cleanly.`);
                 return;
             } else {
