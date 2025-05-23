@@ -76,27 +76,27 @@ async function processRepo(dirName) {
 
         await git.init();
         gitlabUrl = await createRepoOnGitLab(dirName);
-githubUrl = await createRepoOnGitHub(dirName);
+        githubUrl = await createRepoOnGitHub(dirName);
 
-const remotes = await git.getRemotes(true);
+        const remotes = await git.getRemotes(true);
 
-if (!remotes.find(r => r.name === "origin" || r.name === "gitlab")) {
-  await git.init();
-  await git.addRemote("gitlab", gitlabUrl);
-}
+        if (!remotes.find(r => r.name === "origin" || r.name === "gitlab")) {
+            await git.init();
+            await git.addRemote("gitlab", gitlabUrl);
+        }
 
-if (!remotes.find(r => r.name === "github")) {
-  await git.addRemote("github", githubUrl).catch(err => {
-    console.error(`❌ Failed to add GitHub remote for ${dirName}:`, err.message);
-  });
-}
-const remotesNow = await git.getRemotes(true);
-console.log(`🔗 Remotes for ${dirName}:`, remotesNow.map(r => r.name).join(", "));
-    } catch {}
+        if (!remotes.find(r => r.name === "github")) {
+            await git.addRemote("github", githubUrl).catch(err => {
+                console.error(`❌ Failed to add GitHub remote for ${dirName}:`, err.message);
+            });
+        }
+        const remotesNow = await git.getRemotes(true);
+        console.log(`🔗 Remotes for ${dirName}:`, remotesNow.map(r => r.name).join(", "));
+    } catch { }
 
     try {
         await git.raw(["rm", "-r", "--cached", "."]);
-    } catch {}
+    } catch { }
 
     const status = await git.status();
 
