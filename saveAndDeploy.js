@@ -5,47 +5,60 @@ const fs = require("fs");
 const axios = require("axios");
 const simpleGit = require("simple-git");
 
-// Credentials
 const GITHUB_USERNAME = "fepocodes";
 const GITLAB_USERNAME = "fepocodes";
-const BITBUCKET_USERNAME = "fepocodes";
-
 const GITHUB_TOKEN = process.env['Github_Token'];
 const GITLAB_TOKEN = process.env['Gitlab_Token'];
-const BITBUCKET_TOKEN = process.env['Bitbucket_Token'];
-
 const REPOS_DIR = path.join(__dirname, "../");
 
-// GitHub
 async function createRepoOnGitHub(repoName) {
-    // implementation...
-}
-
-// GitLab
-async function createRepoOnGitLab(repoName) {
-    // implementation...
-}
-
-// Bitbucket
-async function createRepoOnBitbucket(repoName) {
-    const url = `https://api.bitbucket.org/2.0/repositories/${BITBUCKET_USERNAME}/${repoName}`;
     try {
         const res = await axios.post(
-            url,
-            { scm: 'git', is_private: false },
+            "https://api.github.com/user/repos",
             {
-                auth: {
-                    username: BITBUCKET_USERNAME,
-                    password: BITBUCKET_TOKEN
+                name: repoName,
+                private: false,
+                auto_init: false
+            },
+            {
+                headers: {
+                    Authorization: `token ${GITHUB_TOKEN}`,
+                    Accept: "application/vnd.github+json",
+                },
+            }
+        );
+        console.log(`✅ GitHub repo created: ${res.data.full_name}`);
+        return res.data.clone_url;
+    } catch (err) {
+        if (err.response?.status === 422) {
+            //console.log(`⚠️ Repo ${repoName} already exists on GitHub.`);
+            return `https://github.com/${GITHUB_USERNAME}/${repoName}.git`;
+        } else {
+            throw err;
+        }
+    }
+}
+
+async function createRepoOnGitLab(repoName) {
+    try {
+        const res = await axios.post(
+            "https://gitlab.com/api/v4/projects",
+            {
+                name: repoName,
+                visibility: "public"
+            },
+            {
+                headers: {
+                    "Private-Token": GITLAB_TOKEN
                 }
             }
         );
-        console.log(`✅ Bitbucket repo created: ${res.data.full_name}`);
-        return res.data.links.clone.find(link => link.name === 'https').href;
+        console.log(`✅ GitLab repo created: ${res.data.path_with_namespace}`);
+        return res.data.http_url_to_repo;
     } catch (err) {
         if (err.response?.status === 400 || err.response?.status === 409) {
-            console.log(`⚠️ Repo ${repoName} already exists on Bitbucket.`);
-            return `https://bitbucket.org/${BITBUCKET_USERNAME}/${repoName}.git`;
+            //console.log(`⚠️ Repo ${repoName} already exists on GitLab.`);
+            return `https://gitlab.com/${GITLAB_USERNAME}/${repoName}.git`;
         } else {
             throw err;
         }
@@ -55,28 +68,31 @@ async function createRepoOnBitbucket(repoName) {
 async function processRepo(dirName) {
     const repoPath = path.join(REPOS_DIR, dirName);
     const git = simpleGit(repoPath);
-    let bitbucketUrl; //, gitlabUrl, githubUrl;
+    let gitlabUrl, githubUrl;
 
     try {
-        // Commented out GitHub and GitLab for testing Bitbucket only
-        // gitlabUrl = await createRepoOnGitLab(dirName);
-        // githubUrl = await createRepoOnGitHub(dirName);
-
-        bitbucketUrl = await createRepoOnBitbucket(dirName);
+        gitlabUrl = await createRepoOnGitLab(dirName);
+        githubUrl = await createRepoOnGitHub(dirName);
 
         await git.init();
+        gitlabUrl = await createRepoOnGitLab(dirName);
+        githubUrl = await createRepoOnGitHub(dirName);
 
         const remotes = await git.getRemotes(true);
 
-        if (!remotes.find(r => r.name === "origin" || r.name === "bitbucket")) {
-            await git.addRemote("bitbucket", bitbucketUrl);
+        if (!remotes.find(r => r.name === "origin" || r.name === "gitlab")) {
+            await git.init();
+            await git.addRemote("gitlab", gitlabUrl);
         }
 
+        if (!remotes.find(r => r.name === "github")) {
+            await git.addRemote("github", githubUrl).catch(err => {
+                console.error(`❌ Failed to add GitHub remote for ${dirName}:`, err.message);
+            });
+        }
         const remotesNow = await git.getRemotes(true);
         console.log(`🔗 Remotes for ${dirName}:`, remotesNow.map(r => r.name).join(", "));
-    } catch (e) {
-        console.error(`❌ Error setting up remotes for ${dirName}:`, e.message);
-    }
+    } catch { }
 
     try {
         await git.raw(["rm", "-r", "--cached", "."]);
@@ -88,11 +104,28 @@ async function processRepo(dirName) {
         await git.add(".");
         await git.commit("🔄 Auto commit changes");
         try {
-            await git.push("bitbucket", "master");
-            // await git.push("gitlab", "master");
-            // await git.push("github", "master");
+            await git.push("gitlab", "master");
+            await git.push("github", "master");
         } catch (err) {
-            console.error(`❌ Failed to push ${dirName}:`, err.message);
+            if (err.message.includes("refspec") || err.message.includes("rejected")) {
+                console.log(`🧹 Repo broken (${dirName}), resetting...`);
+                fs.rmSync(path.join(repoPath, ".git"), { recursive: true, force: true });
+
+                const fresh = simpleGit(repoPath);
+                gitlabUrl = await createRepoOnGitLab(dirName);
+                githubUrl = await createRepoOnGitHub(dirName);
+                await fresh.init();
+                await fresh.addRemote("gitlab", gitlabUrl);
+                await fresh.addRemote("github", githubUrl);
+                await fresh.add(".");
+                await fresh.commit("🚀 Clean reset push");
+                await fresh.push("gitlab", "master", ["--force"]);
+                await fresh.push("github", "master", ["--force"]);
+                console.log(`✅ ${dirName} reset and pushed cleanly.`);
+                return;
+            } else {
+                throw err;
+            }
         }
         console.log(`🚀 Changes pushed for ${dirName}`);
     } else {
@@ -113,7 +146,7 @@ async function main() {
         }
     }
 
-    console.log("🎉 All repositories processed on Bitbucket.");
+    console.log("🎉 All repositories processed.");
 }
 
 main();
